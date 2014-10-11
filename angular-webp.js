@@ -15,6 +15,8 @@ angular.module('l42y.webp', [
     animation: 'UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA'
   };
 
+  var flags = {};
+
   function detectFeature (uri) {
     var deferred = $q.defer();
     var img = new Image();
@@ -33,18 +35,33 @@ angular.module('l42y.webp', [
 
   return {
     detect: function detectWebPSupport () {
-      return detectFeature(webpUri).then(function (isSupported) {
-        if (isSupported) {
-          var promises = {};
-          angular.forEach(testImages, function (image, feature) {
-            promises[feature] = detectFeature(image);
-          });
+      // if WebP detection already finished, return the result
+      if (flags === false ||
+          Object.keys(flags).length === Object.keys(testImages).length) {
+        return $q.when(flags);
+      } else {
+        return detectFeature(webpUri).then(function (isSupported) {
+          if (isSupported) {
+            var promises = {};
+            angular.forEach(testImages, function (image, feature) {
+              // if WebP feature detection already finished, return the result
+              if (flags.hasOwnProperty(feature)) {
+                promises[feature] = $q.when(flags[feature]);
+              } else {
+                promises[feature] = detectFeature(image).then(function (flag) {
+                  flags[feature] = flag; // save the result
+                  return flag;
+                });
+              }
+            });
 
-          return $q.all(promises);
-        }
+            return $q.all(promises);
+          }
 
-        return isSupported;
-      });
+          flags = isSupported;
+          return isSupported;
+        });
+      }
     }
   };
 });
